@@ -30,7 +30,10 @@ on:
         description: 'Paste YAML config (Backends, Routing, Network details)'
         required: true
         type: string
-
+permissions:
+  contents: read
+  id-token: write
+  
 jobs:
   deploy-lb:
     runs-on: ubuntu-latest
@@ -71,7 +74,7 @@ jobs:
       - name: Terraform Init
         run: |
           terraform init \
-            -backend-config="vasu-lbs-tf-state" \
+            -backend-config="bucket=vasu-lbs-tf-state" \
             -backend-config="prefix=lb-deployments/${{ github.actor }}/${{ inputs.lb_name }}"
 
       - name: Terraform Apply
