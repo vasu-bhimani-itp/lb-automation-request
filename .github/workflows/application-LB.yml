@@ -76,7 +76,13 @@ jobs:
           terraform init \
             -backend-config="bucket=vasu-lbs-tf-state" \
             -backend-config="prefix=lb-deployments/${{ github.actor }}/${{ inputs.lb_name }}"
-
+            
+      - name: Generate YAML Configuration File
+        run: |
+          cat << 'EOF' > lb-config.yaml
+          ${{ inputs.yaml_payload }}
+          EOF
+          
       - name: Terraform Apply
         env:
           TF_VAR_lb_name: ${{ inputs.lb_name }}
@@ -85,4 +91,5 @@ jobs:
           TF_VAR_gcp_region: ${{ inputs.region }}
           TF_VAR_yaml_content: ${{ inputs.yaml_payload }}
           TF_VAR_module_name: "applicationLB"
+          TF_VAR_yaml_file_path: ${{ github.workspace }}/lb-config.yaml
         run: terraform apply -auto-approve
