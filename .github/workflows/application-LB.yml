@@ -79,9 +79,12 @@ jobs:
             
       - name: Generate YAML Configuration File
         run: |
-          cat << 'EOF' > lb-config.yaml
-          ${{ inputs.yaml_payload }}
-          EOF
+          jq -r '.inputs.yaml_payload' $GITHUB_EVENT_PATH > ${{ github.workspace }}/lb-config.yaml
+          
+          # Optional: Print the file to the logs so you can visually verify the newlines are safe!
+          echo "--- VERIFYING YAML FORMATTING ---"
+          cat ${{ github.workspace }}/lb-config.yaml
+          echo "---------------------------------"
           
       - name: Terraform Apply
         env:
