@@ -89,7 +89,6 @@ jobs:
           TF_VAR_exposure: ${{ inputs.exposure }}
           TF_VAR_scope: ${{ inputs.scope }}
           TF_VAR_gcp_region: ${{ inputs.region }}
-          TF_VAR_yaml_content: ${{ inputs.json_payload }}
           TF_VAR_module_name: "applicationLB"
-          TF_VAR_yaml_file_path: ${{ github.workspace }}/lb-config.yaml
+          TF_VAR_json_file_path: ${{ github.workspace }}/lb-config.json
         run: terraform apply -auto-approve
