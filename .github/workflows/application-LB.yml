@@ -1,0 +1,84 @@
+name: Deploy Self-Service GCP Load Balancer
+
+on:
+  workflow_dispatch:
+    inputs:
+      lb_name:
+        description: 'Unique name for this Load Balancer'
+        required: true
+        type: string
+      exposure:
+        description: 'External (Public) or Internal (Private)'
+        required: true
+        type: choice
+        options:
+          - external
+          - internal
+      scope:
+        description: 'Deployment Scope'
+        required: true
+        type: choice
+        options:
+          - global
+          - regional
+          - cross-regional
+      region:
+        description: 'GCP Region (Required for regional and cross-regional)'
+        required: false
+        type: string
+      yaml_payload:
+        description: 'Paste YAML config (Backends, Routing, Network details)'
+        required: true
+        type: string
+
+jobs:
+  deploy-lb:
+    runs-on: ubuntu-latest
+    steps:
+      # EDGE CASE GUARDRAILS: Validate inputs before touching infrastructure
+      - name: Validate Architecture Inputs
+        run: |
+          if [[ "${{ inputs.scope }}" != "global" && -z "${{ inputs.region }}" ]]; then
+            echo "::error::Region is required for regional and cross-regional scopes."
+            exit 1
+          fi
+          if [[ "${{ inputs.scope }}" == "global" && "${{ inputs.exposure }}" == "internal" ]]; then
+            echo "::error::GCP does not support 'global' scope with 'internal' exposure. Use 'cross-regional' instead."
+            exit 1
+          fi
+          if [[ "${{ inputs.scope }}" == "cross-regional" && "${{ inputs.exposure }}" == "external" ]]; then
+            echo "::error::'cross-regional' is specifically for Internal Load Balancers. Use 'global' for External."
+            exit 1
+          fi
+
+      - name: Checkout Terraform Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'your-github-org/your-terraform-repo-name'
+          ref: 'main'
+          token: ${{ secrets.TF_REPO_PAT }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+          service_account: 'terraform-sa@my-project.iam.gserviceaccount.com'
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=my-gcp-terraform-state-bucket" \
+            -backend-config="prefix=lb-deployments/${{ github.actor }}/${{ inputs.lb_name }}"
+
+      - name: Terraform Apply
+        env:
+          TF_VAR_lb_name: ${{ inputs.lb_name }}
+          TF_VAR_exposure: ${{ inputs.exposure }}
+          TF_VAR_scope: ${{ inputs.scope }}
+          TF_VAR_region: ${{ inputs.region }}
+          TF_VAR_yaml_content: ${{ inputs.yaml_payload }}
+          TF_VAR_project_id: "your-fixed-project-id"
+        run: terraform apply -auto-approve
