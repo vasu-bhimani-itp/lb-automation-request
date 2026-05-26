@@ -1,4 +1,4 @@
-name: "eploy External LB"
+name: "Deploy External LB"
 
 on:
   workflow_dispatch:
