@@ -1,0 +1,169 @@
+name: "Deploy GCP External Application Load Balancer"
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "GCP Region (e.g. us-central1)"
+        required: true
+        type: choice
+        options:
+          - us-central1
+          - us-east1
+          - us-west1
+          - europe-west1
+          - europe-west2
+          - asia-south1
+          - asia-east1
+          - asia-southeast1
+
+      lb_name:
+        description: "Load Balancer name (lowercase, letters/numbers/hyphens)"
+        required: true
+        type: string
+
+      default_backend_service_name:
+        description: "Default backend service name (REQUIRED – catches all unmatched traffic)"
+        required: true
+        type: string
+
+      backend_a_service_name:
+        description: "Backend service A name (optional)"
+        required: false
+        type: string
+        default: ""
+
+      backend_a_path_prefix:
+        description: "Path prefix for Backend A (e.g. /api). Required if Backend A name is set."
+        required: false
+        type: string
+        default: ""
+
+      backend_b_service_name:
+        description: "Backend service B name (optional)"
+        required: false
+        type: string
+        default: ""
+
+      backend_b_path_prefix:
+        description: "Path prefix for Backend B (e.g. /admin). Required if Backend B name is set."
+        required: false
+        type: string
+        default: ""
+
+      tf_action:
+        description: "Terraform action to perform"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  TF_VERSION: "1.7.5"
+  WORKING_DIR: "./terraform"
+
+jobs:
+  validate-inputs:
+    name: "Validate Inputs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Backend A inputs are paired
+        run: |
+          A_NAME="${{ inputs.backend_a_service_name }}"
+          A_PATH="${{ inputs.backend_a_path_prefix }}"
+          if [[ -n "$A_NAME" && -z "$A_PATH" ]]; then
+            echo "ERROR: backend_a_path_prefix is required when backend_a_service_name is provided."
+            exit 1
+          fi
+          if [[ -z "$A_NAME" && -n "$A_PATH" ]]; then
+            echo "ERROR: backend_a_service_name is required when backend_a_path_prefix is provided."
+            exit 1
+          fi
+
+      - name: Validate Backend B inputs are paired
+        run: |
+          B_NAME="${{ inputs.backend_b_service_name }}"
+          B_PATH="${{ inputs.backend_b_path_prefix }}"
+          if [[ -n "$B_NAME" && -z "$B_PATH" ]]; then
+            echo "ERROR: backend_b_path_prefix is required when backend_b_service_name is provided."
+            exit 1
+          fi
+          if [[ -z "$B_NAME" && -n "$B_PATH" ]]; then
+            echo "ERROR: backend_b_service_name is required when backend_b_path_prefix is provided."
+            exit 1
+          fi
+
+  terraform:
+    name: "Terraform ${{ inputs.tf_action }}"
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Terraform Code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.TERRAFORM_REPO }}
+          ref: 'main'
+          token: ${{ secrets.TF_REPO_PAT }}
+
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Generate terraform.tfvars
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          cat > terraform.tfvars <<TFVARS
+          region                       = "${{ inputs.region }}"
+          lb_name                      = "${{ inputs.lb_name }}"
+          default_backend_service_name = "${{ inputs.default_backend_service_name }}"
+          backend_a_service_name       = "${{ inputs.backend_a_service_name }}"
+          backend_a_path_prefix        = "${{ inputs.backend_a_path_prefix }}"
+          backend_b_service_name       = "${{ inputs.backend_b_service_name }}"
+          backend_b_path_prefix        = "${{ inputs.backend_b_path_prefix }}"
+          TFVARS
+
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=vasu-lbs-tf-state" \
+            -backend-config="prefix=lb-deployments/${{ github.actor }}/${{ inputs.lb_name }}"
+
+      - name: Terraform Validate
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform plan -var-file=terraform.tfvars -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.tf_action == 'apply'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: inputs.tf_action == 'destroy'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform destroy -var-file=terraform.tfvars -auto-approve
+
+      - name: Show Outputs
+        if: inputs.tf_action == 'apply'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform output
