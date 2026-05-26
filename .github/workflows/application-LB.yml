@@ -54,15 +54,16 @@ jobs:
       - name: Checkout Terraform Code
         uses: actions/checkout@v4
         with:
-          repository: 'your-github-org/your-terraform-repo-name'
+          repository: ${{ vars.TERRAFORM_REPO }}
           ref: 'main'
           token: ${{ secrets.TF_REPO_PAT }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
-          service_account: 'terraform-sa@my-project.iam.gserviceaccount.com'
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT }}
+          token_format: access_token
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -80,5 +81,5 @@ jobs:
           TF_VAR_scope: ${{ inputs.scope }}
           TF_VAR_region: ${{ inputs.region }}
           TF_VAR_yaml_content: ${{ inputs.yaml_payload }}
-          TF_VAR_project_id: "your-fixed-project-id"
+          TF_VAR_module_name: "applicationLB"
         run: terraform apply -auto-approve
