@@ -62,7 +62,7 @@ on:
 
 env:
   TF_VERSION: "1.7.5"
-  WORKING_DIR: "./terraform"
+  WORKING_DIR: "."
 
 jobs:
   validate-inputs:
