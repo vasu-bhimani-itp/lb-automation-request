@@ -1,4 +1,4 @@
-name: "Deploy External LB"
+name: "GCP LB automation"
 
 on:
   workflow_dispatch:
