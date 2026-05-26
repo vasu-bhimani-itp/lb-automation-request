@@ -1,0 +1,78 @@
+# ========================================================================
+# FULL FEATURE TEMPLATE: GCP Load Balancer Configuration
+# Note: Do not include LB Name, Exposure, Scope, or Region here. 
+# Those are handled in the GitHub Actions UI dropdowns!
+# ========================================================================
+
+config:
+  # ----------------------------------------------------------------------
+  # FRONTEND & IP SETTINGS
+  # ----------------------------------------------------------------------
+  frontend_ip_type: static               # Options: ephemeral, static
+  frontend_ip_name: "my-reserved-ip"     # Required if type is 'static'
+
+  # ----------------------------------------------------------------------
+  # SECURITY & PROTOCOLS
+  # ----------------------------------------------------------------------
+  enable_https: true                     # Set to true for SSL/TLS
+  ssl_certificate: "projects/my-proj/global/sslCertificates/my-cert" 
+  enable_http_redirect: true             # Auto-redirects HTTP (80) to HTTPS (443)
+
+  # ----------------------------------------------------------------------
+  # INTERNAL NETWORK (⚠️ ONLY required if you chose 'Internal' in the UI)
+  # ----------------------------------------------------------------------
+  network: "projects/my-proj/global/networks/my-vpc"
+  subnetwork: "projects/my-proj/regions/us-central1/subnetworks/my-proxy-subnet"
+
+
+backends:
+  # ----------------------------------------------------------------------
+  # BACKEND 1: Web App (Using Managed Instance Groups & CDN)
+  # ----------------------------------------------------------------------
+  web-frontend:
+    backend_type: MIG                    # Options: MIG, NEG, BUCKET
+    enable_cdn: true                     # Caches static assets globally
+    enable_logging: true                 # Sends traffic logs to Cloud Logging
+    health_check:
+      path: /healthz
+      port: 80
+
+  # ----------------------------------------------------------------------
+  # BACKEND 2: API Service (Using Network Endpoint Groups)
+  # ----------------------------------------------------------------------
+  api-service:
+    backend_type: NEG
+    enable_cdn: false                    # APIs usually shouldn't be cached
+    enable_logging: true
+    health_check:
+      path: /api/status
+      port: 8080
+
+  # ----------------------------------------------------------------------
+  # BACKEND 3: Cloud Storage Bucket (For images/static files)
+  # ----------------------------------------------------------------------
+  assets-bucket:
+    backend_type: BUCKET
+    enable_cdn: true
+    enable_logging: false
+    # Note: BUCKET types do not require a health_check block
+
+
+routing:
+  # ----------------------------------------------------------------------
+  # DOMAIN ROUTING (Host Rules)
+  # ----------------------------------------------------------------------
+  host_rules:
+    - host: www.example.com
+      backend: web-frontend
+    - host: api.example.com
+      backend: api-service
+
+  # ----------------------------------------------------------------------
+  # URL PATH ROUTING (Path Rules)
+  # ----------------------------------------------------------------------
+  path_rules:
+    - path: /static/*
+      backend: assets-bucket
+    - path: /images/*
+      backend: assets-bucket
