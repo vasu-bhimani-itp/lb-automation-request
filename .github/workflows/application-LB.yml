@@ -26,8 +26,8 @@ on:
         description: 'GCP Region (Required for regional and cross-regional)'
         required: false
         type: string
-      yaml_payload:
-        description: 'Paste YAML config (Backends, Routing, Network details)'
+      json_payload:
+        description: 'Paste JSON config (Backends, Routing, Network details)'
         required: true
         type: string
 permissions:
@@ -77,14 +77,11 @@ jobs:
             -backend-config="bucket=vasu-lbs-tf-state" \
             -backend-config="prefix=lb-deployments/${{ github.actor }}/${{ inputs.lb_name }}"
             
-      - name: Generate YAML Configuration File
+      - name: Generate JSON Configuration File
         run: |
-          jq -r '.inputs.yaml_payload' $GITHUB_EVENT_PATH > ${{ github.workspace }}/lb-config.yaml
-          
-          # Optional: Print the file to the logs so you can visually verify the newlines are safe!
-          echo "--- VERIFYING YAML FORMATTING ---"
-          cat ${{ github.workspace }}/lb-config.yaml
-          echo "---------------------------------"
+          cat << 'EOF' > ${{ github.workspace }}/lb-config.json
+          ${{ inputs.json_payload }}
+          EOF
           
       - name: Terraform Apply
         env:
@@ -92,7 +89,7 @@ jobs:
           TF_VAR_exposure: ${{ inputs.exposure }}
           TF_VAR_scope: ${{ inputs.scope }}
           TF_VAR_gcp_region: ${{ inputs.region }}
-          TF_VAR_yaml_content: ${{ inputs.yaml_payload }}
+          TF_VAR_yaml_content: ${{ inputs.json_payload }}
           TF_VAR_module_name: "applicationLB"
           TF_VAR_yaml_file_path: ${{ github.workspace }}/lb-config.yaml
         run: terraform apply -auto-approve
