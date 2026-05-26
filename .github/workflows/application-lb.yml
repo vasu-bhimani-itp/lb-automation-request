@@ -1,4 +1,4 @@
-name: "Deploy GCP External Application Load Balancer"
+name: "eploy External LB"
 
 on:
   workflow_dispatch:
