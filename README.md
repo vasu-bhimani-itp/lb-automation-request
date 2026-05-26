@@ -2,7 +2,7 @@
 
 This workflow automates the creation and destruction of Google Cloud Load Balancers using Terraform.
 
-## 📋 Workflow Inputs
+##  Workflow Inputs
 
 When triggering the workflow, you will be prompted to provide the following inputs:
 
@@ -18,8 +18,12 @@ When triggering the workflow, you will be prompted to provide the following inpu
 | **`tf_action`** | Yes | Terraform action | `plan`, `apply`, `destroy` |
 
 ---
+## Architecture
 
-## 🚀 How to Create a Load Balancer
+![GCP Load Balancer Architecture](/assets/arch.png)
+
+---
+##  How to Create a Load Balancer
 
 1. Go to the **Actions** tab in your GitHub repository.
 2. On the left sidebar, click on the **GCP LB automation** workflow.
@@ -30,7 +34,7 @@ When triggering the workflow, you will be prompted to provide the following inpu
 
 ---
 
-## 🗑️ How to Destroy a Load Balancer
+## How to Destroy a Load Balancer
 
 1. Go to the **Actions** tab and select the **GCP LB automation** workflow.
 2. Click the **Run workflow** dropdown button.
